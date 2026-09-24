@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --navy: #1B2A3D;
+  --navy-light: #26384F;
+  --paper: #EDEFE7;
+  --card: #FFFFFF;
+  --rust: #A8492E;
+  --rust-dark: #8C3B24;
+  --moss: #3E6659;
+  --moss-light: #E4EDE9;
+  --ink: #23262B;
+  --ink-muted: #6B7075;
+  --border: #DDDFD5;
+
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+}

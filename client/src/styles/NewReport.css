@@ -1,0 +1,157 @@
+.page-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--paper);
+}
+
+.page-content {
+  flex: 1;
+  padding: 44px;
+  max-width: 880px;
+}
+
+.page-content h1 {
+  color: var(--ink);
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.subtitle, .hint {
+  color: var(--ink-muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+  max-width: 60ch;
+  line-height: 1.5;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rust);
+  border-radius: 8px;
+  padding: 28px;
+  margin-bottom: 22px;
+}
+
+.card label {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.card input[type="text"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 15px;
+  font-family: var(--font-body);
+  outline: none;
+  margin-bottom: 16px;
+  background: var(--paper);
+}
+
+.card input[type="text"]:focus {
+  border-color: var(--rust);
+  background: var(--card);
+}
+
+.card input[type="file"] {
+  margin-bottom: 16px;
+  display: block;
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.primary-btn, .secondary-btn {
+  padding: 12px 26px;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.primary-btn {
+  background: var(--rust);
+  color: #ffffff;
+}
+
+.primary-btn:hover {
+  background: var(--rust-dark);
+}
+
+.secondary-btn {
+  background: var(--moss-light);
+  color: var(--moss);
+  border: 1px solid transparent;
+}
+
+.secondary-btn:hover {
+  background: #D5E5DE;
+}
+
+.primary-btn:disabled, .secondary-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error-banner {
+  background: #FBE7E2;
+  color: #8C3B24;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.upload-message {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--moss);
+}
+
+.report-card {
+  border-left-color: var(--moss);
+}
+
+.report-card h2 {
+  color: var(--ink);
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+
+.report-content {
+  white-space: pre-wrap;
+  line-height: 1.75;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.agent-trail {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.agent-trail summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--rust);
+  font-size: 13px;
+}
+
+.agent-trail ul {
+  margin-top: 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.agent-trail li {
+  margin-bottom: 6px;
+}
