@@ -1,3 +1,4 @@
+
 const axios = require("axios");
 const cheerio = require("cheerio");
 
@@ -11,11 +12,11 @@ const toolDefinitions = [
     function: {
       name: "web_search",
       description:
-        "Search the web for information on a topic. Returns a list of results with titles, URLs, and short snippets.",
+        "Search the web for information. Returns titles, URLs and snippets. Use before fetching pages.",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "The search query" }
+          query: { type: "string", description: "Search query" }
         },
         required: ["query"]
       }
@@ -26,11 +27,11 @@ const toolDefinitions = [
     function: {
       name: "fetch_page",
       description:
-        "Fetch and read the full text content of a specific web page, given its URL. Use this after web_search to actually read a promising result.",
+        "Fetch and read a web page. Returns its title, URL and content. Successfully fetched pages are automatically saved to the user's knowledge base.",
       parameters: {
         type: "object",
         properties: {
-          url: { type: "string", description: "The URL to fetch" }
+          url: { type: "string", description: "URL of the page to fetch" }
         },
         required: ["url"]
       }
@@ -41,11 +42,11 @@ const toolDefinitions = [
     function: {
       name: "search_knowledge_base",
       description:
-        "Semantically search previously saved sources — including the user's own uploaded documents and any web sources saved from past reports. Use this BEFORE web searching, to check if relevant information is already available.",
+        "Search previously saved web sources and uploaded documents. Use before web searching.",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "What to search for" }
+          query: { type: "string", description: "Search query" }
         },
         required: ["query"]
       }
@@ -56,24 +57,18 @@ const toolDefinitions = [
     function: {
       name: "save_source",
       description:
-        "Save a useful piece of content to the knowledge base for this and future reports, so it can be retrieved again later via search_knowledge_base.",
+        "Save useful content to the knowledge base. Use for content that has not already been saved.",
       parameters: {
         type: "object",
         properties: {
-          content: { type: "string", description: "The text content to save" },
+          content: { type: "string" },
           sourceType: {
             type: "string",
-            enum: ["web", "upload"],
-            description: "Where this content came from"
+            enum: ["web", "upload"]
           },
-          origin: {
-            type: "string",
-            description: "The URL (if web) or filename (if upload) this came from"
-          },
-          topic: {
-            type: "string",
-            description: "The report topic this source is relevant to"
-          }
+          origin: { type: "string" },
+          topic: { type: "string" },
+          title: { type: "string" }
         },
         required: ["content", "sourceType", "origin"]
       }
@@ -85,60 +80,54 @@ const runWebSearch = async (query) => {
   const response = await axios.post("https://api.tavily.com/search", {
     api_key: process.env.TAVILY_API_KEY,
     query,
-    max_results: 4 // trimmed from 5 — fewer, more relevant results = fewer tokens
+    max_results: 4
   });
 
-  return response.data.results.map((r) => ({
-    title: r.title,
-    url: r.url,
-    // Trim snippet length too — Tavily snippets can be long
-    snippet: r.content.slice(0, 500)
+  return (response.data.results || []).map((result) => ({
+    title: result.title,
+    url: result.url,
+    snippet: (result.content || "").slice(0, 500)
   }));
 };
 
-const runFetchPage = async (url) => {
-  const response = await axios.get(url, {
-    timeout: 10000,
-    headers: { "User-Agent": "Mozilla/5.0 (ReportWritingAgent)" }
+const runSaveSource = async (
+  userId,
+  { content, sourceType, origin, topic = "", title = "" }
+) => {
+  if (!content || !origin) {
+    throw new Error("Source content and origin are required");
+  }
+
+  const existing = await Source.findOne({
+    userId,
+    origin,
+    topic,
+    sourceType
   });
 
-  const $ = cheerio.load(response.data);
-  $("script, style, nav, footer, header, aside").remove();
-
-  const text = $("body").text().replace(/\s+/g, " ").trim();
-
-  // Reduced from 6000 — this was the single biggest token cost per call.
-  // 2500 chars (~600-700 tokens) still gives the model plenty to work with
-  // per page, while leaving much more headroom in the rate limit.
-  return text.slice(0, 2500);
-};
-
-const runSearchKnowledgeBase = async (query) => {
-  const results = await searchKnowledgeBase(query, 5);
-  return results;
-};
-
-const runSaveSource = async (userId, { content, sourceType, origin, topic }) => {
-  // Skip saving if we already have something saved from this exact
-  // origin (URL/filename) for this topic — prevents the knowledge base
-  // from accumulating multiple, differently-worded summaries of the same
-  // source across separate report runs.
-  const existing = await Source.findOne({ userId, origin, topic });
   if (existing) {
     return {
       saved: 0,
+      sourceIds: [existing._id.toString()],
+      title: existing.title || title,
       origin,
-      note: "Already have a source from this origin for this topic — skipped duplicate"
+      note: "Source already exists"
     };
   }
 
   const chunks = chunkText(content);
+
+  if (!chunks.length) {
+    throw new Error("No readable content found to save");
+  }
+
   const savedChunks = [];
 
   for (const chunk of chunks) {
     const sourceDoc = await Source.create({
       userId,
       sourceType,
+      title,
       origin,
       content: chunk,
       topic
@@ -148,6 +137,7 @@ const runSaveSource = async (userId, { content, sourceType, origin, topic }) => 
       id: sourceDoc._id.toString(),
       text: chunk,
       sourceType,
+      title,
       origin,
       topic
     });
@@ -157,24 +147,77 @@ const runSaveSource = async (userId, { content, sourceType, origin, topic }) => 
 
   return {
     saved: savedChunks.length,
-    origin,
-    sourceIds: savedChunks.map((c) => c.id)
+    sourceIds: savedChunks.map((chunk) => chunk.id),
+    title,
+    origin
   };
 };
 
-const executeTool = async (userId, name, args) => {
+const runFetchPage = async (userId, url, topic = "") => {
+  const response = await axios.get(url, {
+    timeout: 15000,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (ReportWritingAgent)"
+    }
+  });
+
+  const $ = cheerio.load(response.data);
+
+  const title = $("title").first().text().trim() || url;
+
+  $("script, style, nav, footer, header, aside, noscript").remove();
+
+  const content = $("body")
+    .text()
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 12000);
+
+  if (!content) {
+    throw new Error("Could not extract readable page content");
+  }
+
+  const saved = await runSaveSource(userId, {
+    content,
+    sourceType: "web",
+    origin: url,
+    topic,
+    title
+  });
+
+  return {
+    title,
+    url,
+    content,
+    savedSourceIds: saved.sourceIds,
+    saved: saved.saved
+  };
+};
+
+const runSearchKnowledgeBase = async (query) => {
+  return await searchKnowledgeBase(query, 5);
+};
+
+const executeTool = async (userId, name, args, context = {}) => {
   switch (name) {
     case "web_search":
       return runWebSearch(args.query);
+
     case "fetch_page":
-      return runFetchPage(args.url);
+      return runFetchPage(userId, args.url, context.topic || "");
+
     case "search_knowledge_base":
       return runSearchKnowledgeBase(args.query);
+
     case "save_source":
       return runSaveSource(userId, args);
+
     default:
       return { error: `Unknown tool: ${name}` };
   }
 };
 
-module.exports = { toolDefinitions, executeTool };
+module.exports = {
+  toolDefinitions,
+  executeTool
+};
