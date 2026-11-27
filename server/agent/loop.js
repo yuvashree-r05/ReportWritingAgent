@@ -96,24 +96,26 @@ You are a careful research agent that writes accurate, source-based reports.
 HOW TO RESEARCH:
 1. Search the knowledge base first with search_knowledge_base.
 2. If that is not enough, use web_search to find sources.
-3. Use fetch_page to read up to 2 of the best sources. Fetched pages are saved automatically.
-4. Stop searching as soon as you have enough evidence. Do not repeat the same search.
+3. Use fetch_page to read up to 2 of the best sources.
+4. Stop searching as soon as you have enough evidence.
 
 RULES FOR THE REPORT:
-- Only state facts that appear in the sources you read.
+- Only state facts that appear in sources you actually read.
+- Only cite sources you actually read. Never cite a source based on a search snippet or memory.
 - Never invent statistics, dates, quotes, study findings or source names.
-- Name the source for each important fact, using its name or URL.
+- For every number, say what it measures and which source it came from.
+- Do not write citation codes, IDs or brackets. Write the source name and its full URL instead.
+- Use exactly 2 to 4 sections. Do not add more.
 - Keep study findings, background information and your own opinion separate.
 - If the evidence is weak or missing, say so.
-- If sources disagree, explain the disagreement.
-- Do not use markdown headers that start with #. Use plain section titles.
+- Do not use markdown headers that start with #.
 
 REPORT LAYOUT:
 - A title
 - A short introduction
 - 2 to 4 sections with specific findings
 - A short conclusion
-- A list of the sources you actually used
+- A "Sources" list with the full URL of each source you read
 `;
 
 // Instructions for the AI when it checks an existing report.
@@ -138,6 +140,28 @@ REPORT LAYOUT:
 4. Corrections
 5. Sources you examined
 `;
+
+// Removes source IDs from a tool result, so the AI never sees them.
+// The app still keeps the IDs internally.
+const hideIds = (value) => {
+  if (Array.isArray(value)) {
+    return value.map(hideIds);
+  }
+
+  if (value && typeof value === "object") {
+    const copy = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "id" || key === "savedSourceIds") continue;
+      copy[key] = hideIds(item);
+    }
+    return copy;
+  }
+
+  return value;
+};
+
+// Removes leftover citation codes like 【6b09b9ae190b54b3bb70b871】 from the report text.
+const cleanReport = (text = "") => text.replace(/【[^】]*】/g, "").trim();
 
 // Remembers which sources the AI actually used, so the app can show them later.
 const rememberSources = (toolName, result, sourcesUsed) => {
@@ -182,7 +206,8 @@ const runToolCall = async (userId, call, topic, steps, sourcesUsed) => {
   return {
     role: "tool",
     tool_call_id: call.id,
-    content: JSON.stringify(result)
+    // The AI gets the result without IDs. The app keeps the full result above.
+    content: JSON.stringify(hideIds(result))
   };
 };
 
@@ -299,7 +324,7 @@ ${uploadedNote.slice(0, 2000)}`;
       message = data.choices?.[0]?.message;
     }
 
-    const report = message?.content?.trim();
+    const report = cleanReport(message?.content);
 
     if (!report) {
       return {
