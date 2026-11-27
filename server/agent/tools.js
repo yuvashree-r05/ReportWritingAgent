@@ -94,22 +94,22 @@ const runSaveSource = async (
   userId,
   { content, sourceType, origin, topic = "", title = "" }
 ) => {
-  if (!content || !origin) {
-    throw new Error("Source content and origin are required");
+  if (!userId || !content || !origin || !sourceType) {
+    throw new Error("User, content, source type and origin are required");
   }
 
-  const existing = await Source.findOne({
+  const existing = await Source.find({
     userId,
     origin,
     topic,
     sourceType
-  });
+  }).sort({ createdAt: 1 });
 
-  if (existing) {
+  if (existing.length > 0) {
     return {
       saved: 0,
-      sourceIds: [existing._id.toString()],
-      title: existing.title || title,
+      sourceIds: existing.map((source) => source._id.toString()),
+      title: existing[0].title || title,
       origin,
       note: "Source already exists"
     };
@@ -154,6 +154,12 @@ const runSaveSource = async (
 };
 
 const runFetchPage = async (userId, url, topic = "") => {
+  const parsedUrl = new URL(url);
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Only HTTP and HTTPS URLs are supported");
+  }
+
   const response = await axios.get(url, {
     timeout: 15000,
     headers: {
