@@ -7,9 +7,8 @@ const fs = require("fs");
 
 /**
  * POST /api/agent/generate-report
- * body: { topic }
- * userId now comes from the verified JWT (req.userId), set by the
- * verifyToken middleware — never trusted from the request body.
+ * Body: { topic }
+ * The user ID comes from the login token (req.userId), never from the request body.
  */
 const generateReport = async (req, res) => {
   try {
@@ -20,8 +19,18 @@ const generateReport = async (req, res) => {
       return res.status(400).json({ message: "topic is required" });
     }
 
-    const { report, steps, sourcesUsed } = await runAgent(userId, topic);
+    const { report, status, notice, steps, sourcesUsed } = await runAgent(userId, topic);
 
+    // If the report failed, send the message back and save nothing.
+    if (status === "error") {
+      return res.status(503).json({
+        message: report,
+        status,
+        steps
+      });
+    }
+
+    // Keep only the source IDs that look like valid database IDs.
     const sourceIds = sourcesUsed
       .map((s) => s.id)
       .filter((id) => id && id.length === 24);
@@ -35,7 +44,9 @@ const generateReport = async (req, res) => {
 
     res.status(201).json({
       report: savedReport,
-      steps
+      steps,
+      status,
+      notice
     });
 
   } catch (error) {
@@ -46,8 +57,8 @@ const generateReport = async (req, res) => {
 
 /**
  * POST /api/agent/upload-document
- * multipart/form-data: { topic (optional), file }
- * userId comes from the verified JWT, same as above.
+ * Form data: { topic (optional), file }
+ * The user ID comes from the login token, same as above.
  */
 const uploadDocument = async (req, res) => {
   try {
@@ -58,11 +69,13 @@ const uploadDocument = async (req, res) => {
       return res.status(400).json({ message: "A file is required" });
     }
 
+    // Read the text from the file and cut it into pieces.
     const rawText = await parseDocument(req.file.path, req.file.mimetype);
     const chunks = chunkText(rawText);
 
     const savedChunks = [];
 
+    // Save each piece to the database.
     for (const chunk of chunks) {
       const sourceDoc = await Source.create({
         userId,
@@ -81,8 +94,10 @@ const uploadDocument = async (req, res) => {
       });
     }
 
+    // Add the pieces to the search index.
     await upsertChunks(savedChunks);
 
+    // Delete the uploaded file from the server, since its text is now saved.
     fs.unlink(req.file.path, () => {});
 
     res.status(201).json({
