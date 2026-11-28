@@ -109,6 +109,9 @@ RULES FOR THE REPORT:
 - Keep study findings, background information and your own opinion separate.
 - If the evidence is weak or missing, say so.
 - Do not use markdown headers that start with #.
+- Only include causes, examples and explanations that the sources state. Do not add your own.
+- Attribute each figure to the study or organization that produced it. If you read that study through another source, write "as cited in" and name that source.
+- Only make comparisons (such as "more than" or "comparable to") that the sources make. Do not create your own.
 
 REPORT LAYOUT:
 - A title
